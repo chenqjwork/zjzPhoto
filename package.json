@@ -6,7 +6,7 @@
   "description": "纯前端证件照制作工具：本地抠图、一键换底色、规范尺寸裁切、相纸排版",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run fetch:models && tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "fetch:models": "node scripts/fetch-models.mjs",
     "typecheck": "tsc --noEmit",

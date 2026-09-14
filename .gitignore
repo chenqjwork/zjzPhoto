@@ -1,5 +1,33 @@
-node_modules
-dist
-tests/__artifacts__
-*.log
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
 .vite/
+
+# 模型与推理文件：构建期由 fetch:models 下载，不入库（保留目录占位 .gitkeep）
+public/models/*
+!public/models/.gitkeep
+public/wasm/*
+!public/wasm/.gitkeep
+
+# 测试产物
+tests/__artifacts__/
+playwright-report/
+test-results/
+
+# 日志
+*.log
+npm-debug.log*
+
+# 环境变量（切勿提交任何密钥）
+.env
+.env.*
+!.env.example
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+!.vscode/extensions.json
