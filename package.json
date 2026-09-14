@@ -1,0 +1,25 @@
+{
+  "name": "id-photo-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "纯前端证件照制作工具：本地抠图、一键换底色、规范尺寸裁切、相纸排版",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "fetch:models": "node scripts/fetch-models.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "node tests/e2e.mjs",
+    "test:unit": "node tests/unit-decontam.mjs",
+    "test": "npm run typecheck && npm run test:unit"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.20"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0",
+    "typescript": "~5.6.3",
+    "vite": "^5.4.11"
+  }
+}

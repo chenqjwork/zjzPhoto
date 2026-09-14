@@ -1,0 +1,37 @@
+# CNB 流水线配置
+#
+# - pull_request / push：安装依赖 → 下载自托管模型 → 类型检查 → 构建 → 单元测试
+# - 云原生开发：点击按钮直接进入在线预览（模型自动下载）
+
+main:
+  pull_request:
+    - name: build-and-test
+      docker:
+        image: node:20
+      env:
+        NPM_CONFIG_REGISTRY: https://registry.npmmirror.com
+      stages:
+        - name: install
+          script: npm ci
+        - name: fetch-models
+          script: npm run fetch:models
+        - name: build
+          script: npm run build
+        - name: unit-test
+          script: npm run test:unit
+
+$:
+  vscode:
+    - docker:
+        build: .ide/Dockerfile
+      services:
+        - name: vscode
+          options:
+            onlyPreview: true
+            launch: npm run dev -- --host 0.0.0.0 --port 5173
+            keepAliveTimeout: 30m
+      stages:
+        - name: prepare
+          script: |
+            npm ci
+            npm run fetch:models

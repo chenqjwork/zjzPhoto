@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="免费在线证件照制作：浏览器本地抠图换底色，一寸二寸等六种规格，导出 300dpi 标准像素，照片不上传服务器。"
+    />
+    <title>证件照工坊 · 本地抠图换底色</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">跳到主内容</a>
+
+    <header class="site-header">
+      <div class="shell shell--wide header-inner">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">证</span>
+          <div class="brand-text">
+            <strong>证件照工坊</strong>
+            <span>本地抠图 · 一键换底 · 标准尺寸</span>
+          </div>
+        </div>
+        <span class="privacy-badge" id="privacy-hint">照片不上传服务器</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- ===================== 上传区 ===================== -->
+      <section class="shell hero" aria-labelledby="hero-title">
+        <h1 id="hero-title">三秒钟做一张合格证件照</h1>
+        <p class="hero-sub">
+          上传照片 → 自动抠图 → 换底色 → 按规格导出。全程在你的浏览器里完成，
+          <strong>图片不会离开这台设备</strong>。
+        </p>
+
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="选择或拖入照片">
+          <div class="dropzone-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M24 33V11" />
+              <path d="M16 19l8-8 8 8" />
+              <path d="M9 30v6a4 4 0 0 0 4 4h22a4 4 0 0 0 4-4v-6" />
+            </svg>
+          </div>
+          <p class="dropzone-title">点击选择照片</p>
+          <p class="dropzone-hint">或将照片拖到这里 · 也可直接 Ctrl+V 粘贴</p>
+          <p class="dropzone-formats">支持 JPG / PNG / WebP，建议正面免冠、光线均匀</p>
+          <button type="button" class="btn btn-primary" id="pick-btn">选择照片</button>
+          <input type="file" id="file-input" accept="image/*" hidden />
+        </div>
+
+        <ul class="feature-row">
+          <li><span aria-hidden="true">🔒</span> 纯本地处理，无后端</li>
+          <li><span aria-hidden="true">🧠</span> 浏览器内 AI 抠图</li>
+          <li><span aria-hidden="true">📐</span> 300dpi 标准像素</li>
+        </ul>
+      </section>
+
+      <!-- ===================== 工作区 ===================== -->
+      <section class="shell workspace hidden" id="workspace" aria-label="证件照编辑">
+        <div class="status hidden" id="status" role="status" aria-live="polite">
+          <div class="status-row">
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="status-text">处理中…</span>
+          </div>
+          <div class="progress hidden" id="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+        </div>
+
+        <div class="layout">
+          <!-- 左：预览 -->
+          <div class="panel preview-panel">
+            <div class="panel-head">
+              <h2>预览</h2>
+              <div class="preview-titles">
+                <strong id="preview-headline">一寸 · 295×413</strong>
+                <span id="preview-subline"></span>
+              </div>
+            </div>
+            <div class="preview-stage">
+              <div class="preview-frame" id="preview-frame">
+                <canvas id="preview-canvas" aria-label="证件照预览"></canvas>
+              </div>
+            </div>
+            <p class="preview-note" id="preview-note"></p>
+          </div>
+
+          <!-- 右：设置 -->
+          <div class="panel controls-panel">
+            <fieldset class="group">
+              <legend>尺寸规格<small>300dpi 像素</small></legend>
+              <div class="chips" id="size-list" role="radiogroup" aria-label="尺寸规格"></div>
+            </fieldset>
+
+            <fieldset class="group">
+              <legend>背景颜色</legend>
+              <div class="swatches" id="bg-list" role="radiogroup" aria-label="背景颜色"></div>
+              <div class="custom-color">
+                <label class="field">
+                  <span>自定义</span>
+                  <input type="color" id="custom-color" value="#FFFFFF" aria-label="选择自定义背景色" />
+                </label>
+                <label class="field field-hex">
+                  <span class="vh">Hex</span>
+                  <input
+                    type="text"
+                    id="custom-hex"
+                    value="#FFFFFF"
+                    spellcheck="false"
+                    autocomplete="off"
+                    maxlength="7"
+                    aria-label="输入 Hex 色值"
+                  />
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset class="group">
+              <legend>导出设置</legend>
+
+              <label class="field field-range">
+                <span class="field-label">
+                  边缘去污染
+                  <button
+                    type="button"
+                    class="tip"
+                    title="半透明边缘像素按 F=(C-(1-α)·B)/α 反解，消除原背景残留。数值越高，去白边越彻底。"
+                    aria-label="去污染说明"
+                  >?</button>
+                </span>
+                <input type="range" id="decontam" min="0" max="100" value="85" />
+                <output id="decontam-value">85%</output>
+              </label>
+
+              <label class="field field-range">
+                <span class="field-label">JPG 画质</span>
+                <input type="range" id="quality" min="0.7" max="1" step="0.01" value="0.96" />
+                <output>96%</output>
+              </label>
+
+              <label class="field field-check">
+                <input type="checkbox" id="sheet-toggle" />
+                <span>同时导出 5 寸相纸排版（1500×1050，8 张，带裁切线）</span>
+              </label>
+
+              <div class="export-actions" id="export-panel">
+                <button type="button" class="btn btn-primary" id="export-jpg">导出 JPG</button>
+                <button type="button" class="btn btn-ghost" id="export-png">导出 PNG</button>
+              </div>
+
+              <button type="button" class="btn btn-text" id="change-btn">换一张照片</button>
+            </fieldset>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== 说明 ===================== -->
+      <section class="shell info" aria-labelledby="info-title">
+        <h2 id="info-title">使用说明</h2>
+        <div class="info-grid">
+          <article>
+            <h3>1. 选一张好照片</h3>
+            <p>正面免冠、五官清晰、光线均匀。尽量避开与衣服同色的复杂背景，抠图效果会更好。</p>
+          </article>
+          <article>
+            <h3>2. 自动抠图与构图</h3>
+            <p>
+              浏览器本地运行人脸检测与人像分割，自动让人脸居中、头顶留白约 10%，
+              头部高度约占画面高度的 60%，符合证件照通行规范。
+            </p>
+          </article>
+          <article>
+            <h3>3. 换底色不会重抠</h3>
+            <p>
+              抠图结果一次性缓存，切换白 / 蓝 / 红或任意 Hex 只做像素合成，实时生效、不发新请求。
+              边缘会做颜色去污染，避免换深色底时出现白边。
+            </p>
+          </article>
+          <article>
+            <h3>4. 导出</h3>
+            <p>
+              导出像素精确等于所选规格（一寸即 295×413），并写入 300dpi 元数据，冲印店可直接使用。
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell">
+        <p>证件照工坊 · 纯前端实现，无服务器、无账号、无上传</p>
+        <p class="muted">
+          抠图 MediaPipe ImageSegmenter (Apache-2.0) · 人脸检测 MediaPipe FaceDetector
+          (Apache-2.0)
+        </p>
+      </div>
+    </footer>
+
+    <p class="fatal hidden" id="fatal" role="alert"></p>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
