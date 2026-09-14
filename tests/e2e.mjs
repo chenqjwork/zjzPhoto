@@ -193,6 +193,45 @@ async function main() {
 
   await page.goto(BASE, { waitUntil: 'networkidle' });
 
+  // 回归：选择照片入口不能重复触发系统文件框
+  // 背景：#pick-btn 位于 #dropzone 内部，若两处都监听 click 且不阻止冒泡，
+  // 一次点击会调用两次 fileInput.click() —— 弹窗刚开就被取消，
+  // 表现为「首次弹出后自动隐藏，必须再点一次」。
+  {
+    const countClicks = async () => {
+      await page.evaluate(() => {
+        window.__pickerClicks = 0;
+        const inp = document.getElementById('file-input');
+        inp.click = function () {
+          window.__pickerClicks++;
+        };
+      });
+      return () => page.evaluate(() => window.__pickerClicks);
+    };
+
+    // 用真实鼠标点击（会走完整冒泡链路），而非直接派发到按钮
+    const read = await countClicks();
+    await page.click('#pick-btn');
+    await page.waitForTimeout(120);
+    const viaBtn = await read();
+    record('回归 点击「选择照片」按钮只触发 1 次文件框', viaBtn === 1, `实际触发 ${viaBtn} 次`);
+
+    const read2 = await countClicks();
+    await page.click('.dropzone-title');
+    await page.waitForTimeout(120);
+    const viaDz = await read2();
+    record('回归 点击拖拽区只触发 1 次文件框', viaDz === 1, `实际触发 ${viaDz} 次`);
+
+    // dropzone 带 role=button，键盘 Enter 应与鼠标等价
+    const read3 = await countClicks();
+    await page.focus('#dropzone');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(120);
+    const viaKey = await read3();
+    record('回归 拖拽区按 Enter 键可打开文件框', viaKey === 1, `实际触发 ${viaKey} 次`);
+  }
+
+
   /* ==================== A. 确定性测试（注入已知掩膜） ==================== */
   console.log('── A. 确定性验证（注入已知 alpha 掩膜）\n');
   const injected = await page.evaluate(INJECTION_SCRIPT);

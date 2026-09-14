@@ -36,6 +36,61 @@ npm run build          # 生产构建（含 tsc 类型检查）
 npm run preview        # 预览构建产物
 ```
 
+> `npm run dev` / `vite` 启动时会自动做一次资源自检：若 `public/wasm` 或
+> `public/models` 里没有文件，会直接报错并提示执行 `npm run fetch:models`，
+> 不会带着一个「一上传照片就 404」的服务继续跑。
+> 需要跳过自检（例如 CI 中资源由别处提供）时设置环境变量 `SKIP_ASSET_CHECK=1`。
+
+### 报 `vision_wasm_internal.js 404` 怎么办
+
+若页面加载后上传照片失败，控制台出现：
+
+```
+GET http://localhost:5173/wasm/vision_wasm_internal.js  404 Not Found
+```
+
+说明 **自托管资源没下载**（这是最常见的原因，不是代码 bug）：
+
+- 模型 / WASM 合计约 25MB，**没有提交进 git**（见 `.gitignore` 里的 `public/wasm/*`、
+  `public/models/*`），所以 clone 后必须跑一次 `npm run fetch:models`；
+- 缺文件时 MediaPipe 会去 fetch 那个 JS 加载器，而 Vite / 大多数静态托管会把
+  找不到的路径 **回退成 `index.html`（200 或 404 都可能是回退页）**，
+  真正的错误信息因此被掩盖。
+
+修复步骤：
+
+```bash
+npm run fetch:models    # 下载 + sha256 校验
+npm run verify:assets   # 只校验不下载，确认 6 个文件全部到位
+```
+
+本项目已内置防护，正常情况下不会让你看到这个 404：
+
+1. `npm run dev` / `vite` 启动前自检 —— 缺文件直接启动失败并给出提示（`vite.config.ts`）；
+2. 页面侧 `src/segment.ts` 的 `ensureAssets()` —— 上传照片前先 `HEAD` 探测关键资源，
+   缺失时在界面上显示「请执行 `npm run fetch:models`」而不是笼统的「处理失败，请重试」。
+   探测用 `HEAD` 并额外检查 `content-type`，因此 SPA fallback 返回的 HTML 不会被误判成文件存在。
+
+### 为什么点「选择照片」要点两次
+
+**已修复**。现象：首次点击弹出系统文件框后立刻自动关闭，必须再点一次。
+
+成因是 DOM 结构 + 事件冒泡：`#pick-btn` 位于 `#dropzone` 内部，而两者当时都各自
+监听 `click` 并调用 `fileInput.click()`。一次真实点击会依次触发两个 handler：
+
+1. 按钮自己的 handler → `fileInput.click()`（弹窗打开）
+2. 事件冒泡到 `#dropzone` → 又一次 `fileInput.click()`（弹窗被立即取消）
+
+修复方式是把「打开文件框」收敛为单一入口 `App.openPicker()`，
+并让按钮 / 换图按钮的 handler 调用 `e.stopPropagation()`，不再与拖拽区的
+委托 handler 叠加。顺带补上了拖拽区（`role="button" tabindex="0"`）缺失的
+Enter / Space 键盘支持。
+
+`tests/e2e.mjs` 中有三条回归断言，分别对按钮、拖拽区、键盘 Enter 校验
+`fileInput.click()` 恰好被调用 **1 次** —— 这类「多绑定一次」的 bug 不会在
+功能测试里暴露（功能最终仍可用），所以必须显式计数。
+
+
 ## 模型文件必须自托管
 
 **运行时不访问任何外部 CDN**（Google / jsDelivr 在国内均不可用），
@@ -150,7 +205,8 @@ Out = α·F + (1-α)·G         ← 换底色
 ```bash
 npm run typecheck    # tsc --noEmit
 npm run build        # 类型检查 + 生产构建
-npm run test:unit     # 去污染数学的单元测试（不需要浏览器）
+npm run test:unit     # 单元测试：去污染数学 + 资源自检（不需要浏览器）
+npm run verify:assets # 只校验模型/WASM 是否齐全（不下载）
 npm run test:e2e      # 端到端验收测试（需要 build + Playwright）
 ```
 
@@ -167,6 +223,8 @@ npm run test:e2e      # 端到端验收测试（需要 build + Playwright）
 - 六种规格导出像素精确相等
 - 一次导出产生「单张 + 相纸」两个文件，相纸 `1500×1050` 且 8 格均有内容
 - 375px 下无横向滚动（含逐元素溢出扫描）
+- **选择照片只触发一次系统文件框**：按钮 / 拖拽区 / 键盘 Enter 三个入口
+  各断言只调用 1 次 `fileInput.click()`（回归防护，见下方「已知限制」）
 
 **B. 真实模型推理** —— 用一张真实人像照跑完整链路：
 
@@ -177,6 +235,15 @@ npm run test:e2e      # 端到端验收测试（需要 build + Playwright）
 
 `tests/unit-decontam.mjs` 还从源码层面断言去污染公式确实存在，
 并做数值验证（复现「不去污染会偏白」这一现象）。
+
+`tests/unit-assets.mjs` 覆盖「模型没下载」这条最常见的故障路径（16 项）：
+
+- 资源齐全时自检放行；缺 wasm / 缺模型 / 真 404 / `200 + text/html` 回退页时均能拦截
+- 网络异常不会误判成文件缺失；失败后可重试（修好文件刷新即恢复）
+- 子路径部署时 URL 基于 `document.baseURI` 解析
+- 源码层面断言 `ensureAssets()` 已接入 `segment.ts` / `face.ts` / `app.ts`，
+  且 `vite.config.ts` 启动自检、`package.json` 提供 `verify:assets`
+- `fetch-models.mjs --verify-only` 的真实退出码行为
 
 首次运行需要安装浏览器：
 
@@ -202,6 +269,7 @@ scripts/
   fetch-models.mjs   下载并校验自托管模型
 tests/
   unit-decontam.mjs  去污染数学单元测试
+  unit-assets.mjs    自托管资源自检的单元测试（404 故障路径）
   e2e.mjs            端到端验收测试
   __fixtures__/      测试用真人照片
 ```

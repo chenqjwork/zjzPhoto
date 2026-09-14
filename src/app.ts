@@ -21,7 +21,7 @@ import { applyBackground, estimateBackgroundColor, parseHex, toHex, type Rgb } f
 import { detectLargestFace, type FaceBox } from './face';
 import { computeCropRect, clampRect } from './crop';
 import { refineAlpha } from './refine';
-import { segmentPerson } from './segment';
+import { ensureAssets, segmentPerson } from './segment';
 import {
   canvasToBlob,
   composeSheet,
@@ -124,16 +124,43 @@ export class App {
 
   /* -------------------------------------------------------------- 初始化 */
 
+  /**
+   * 打开系统文件选择框。
+   *
+   * 注意：`#pick-btn` 位于 `#dropzone` 内部，两处都监听 click 会让一次点击
+   * 触发两次 `fileInput.click()` —— 系统弹窗刚打开就被第二次调用取消，
+   * 表现为「首次弹出后自动隐藏，必须再点一次」。因此这里统一收敛为
+   * 单一入口，并由按钮的 handler 阻止冒泡。
+   */
+  private openPicker(): void {
+    this.fileInput.value = '';
+    this.fileInput.click();
+  }
+
   private bind(): void {
-    this.pickBtn.addEventListener('click', () => this.fileInput.click());
-    this.changeBtn.addEventListener('click', () => this.fileInput.click());
+    // 同一动作只绑定一次：阻止冒泡，避免与 dropzone 的委托 handler 叠加
+    this.pickBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openPicker();
+    });
+    this.changeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openPicker();
+    });
     this.fileInput.addEventListener('change', () => {
       const file = this.fileInput.files?.[0];
       if (file) void this.handleFile(file);
     });
 
     const dz = this.dropzone;
-    dz.addEventListener('click', () => this.fileInput.click());
+    dz.addEventListener('click', () => this.openPicker());
+    // dropzone 带 role="button" 与 tabindex，键盘操作需与鼠标等价
+    dz.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        this.openPicker();
+      }
+    });
     ['dragenter', 'dragover'].forEach((ev) =>
       dz.addEventListener(ev, (e) => {
         e.preventDefault();
@@ -321,6 +348,10 @@ export class App {
     try {
       this.setStatus('正在读取照片…');
       this.setProgress(0.05);
+
+      // 先自检自托管资源，缺文件时直接给出「执行 npm run fetch:models」的提示，
+      // 而不是让 MediaPipe 抛出难以定位的 404（见 segment.ts ensureAssets）
+      await ensureAssets();
 
       if (this.photo) URL.revokeObjectURL(this.photo.objectUrl);
       this.photo = await loadPhoto(file);
