@@ -21,7 +21,7 @@ import { applyBackground, estimateBackgroundColor, parseHex, toHex, type Rgb } f
 import { detectLargestFace, type FaceBox } from './face';
 import { computeCropRect, clampRect } from './crop';
 import { refineAlpha } from './refine';
-import { ensureAssets, segmentPerson } from './segment';
+import { segmentPerson } from './segment';
 import {
   canvasToBlob,
   composeSheet,
@@ -348,10 +348,6 @@ export class App {
     try {
       this.setStatus('正在读取照片…');
       this.setProgress(0.05);
-
-      // 先自检自托管资源，缺文件时直接给出「执行 npm run fetch:models」的提示，
-      // 而不是让 MediaPipe 抛出难以定位的 404（见 segment.ts ensureAssets）
-      await ensureAssets();
 
       if (this.photo) URL.revokeObjectURL(this.photo.objectUrl);
       this.photo = await loadPhoto(file);
