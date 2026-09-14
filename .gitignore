@@ -4,6 +4,7 @@ node_modules/
 # 构建产物
 dist/
 .vite/
+.wrangler/
 
 # 模型与推理文件：构建期由 fetch:models 下载，不入库（保留目录占位 .gitkeep）
 public/models/*

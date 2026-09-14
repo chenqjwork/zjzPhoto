@@ -1,12 +1,12 @@
-# Cloudflare Pages 部署配置（新版 Wrangler Pages 语法）
-# 参考：https://developers.cloudflare.com/pages/functions/wrangler-configuration/
+# Cloudflare Workers + Static Assets 部署配置
+# 说明：本项目是纯前端静态站点（无后端 Worker 业务逻辑），
+# 通过 Workers 的静态资源功能发布 dist/ 产物。
+# 参考：https://developers.cloudflare.com/workers/static-assets/
 
 name = "id-photo-studio"
 compatibility_date = "2024-11-01"
 
-[pages]
-build_output_dir = "dist"
-
-# 可选：如果要走 Functions（本纯前端项目不需要），开启下面行并新建 functions/ 目录
-# [build]
-# command = "npm run build"
+[assets]
+directory = "./dist"
+# 未匹配到静态文件时回退到 index.html（单页应用友好；本项目无路由，加了也无害）
+not_found_handling = "single-page-application"
