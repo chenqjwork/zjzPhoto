@@ -1,9 +1,5 @@
 node_modules
 dist
-public/models/*
-!public/models/.gitkeep
-public/wasm/*
-!public/wasm/.gitkeep
 tests/__artifacts__
 *.log
 .vite/
